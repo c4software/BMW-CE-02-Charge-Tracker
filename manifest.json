@@ -1,8 +1,8 @@
 {
     "domain": "bmw_ce02_charge_tracker",
     "name": "BMW CE-02 Charge Tracker",
-    "documentation": "",
-    "issue_tracker": "",
+    "documentation": "https://github.com/c4software/BMW-CE-02-Charge-Tracker",
+    "issue_tracker": "https://github.com/c4software/BMW-CE-02-Charge-Tracker/issues",
     "dependencies": [],
     "codeowners": ["@c4software"],
     "requirements": [],
