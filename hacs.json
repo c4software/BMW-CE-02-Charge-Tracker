@@ -1,0 +1,9 @@
+{
+    "name": "BMW CE-02 Charge Tracker",
+    "country": [
+      "ALL"
+    ],
+    "homeassistant": "2023.1.2",
+    "hacs": "1.29.1",
+    "render_readme": true
+}
