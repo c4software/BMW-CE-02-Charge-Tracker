@@ -6,6 +6,7 @@ from homeassistant.components.sensor import (
     RestoreSensor,
     SensorDeviceClass,
     SensorStateClass,
+    SensorEntity,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback, async_get_current_platform
@@ -50,7 +51,7 @@ class BMWCE02ChargeController:
 
     async def async_initialize_listeners(self):
         """Initialize listeners. Called after sensor state restoration."""
-        self.async_unsubscribe_listeners() # Nettoie les anciens listeners au cas où
+        self.async_unsubscribe_listeners() 
 
         if self.persisted_is_charging:
             self.is_charging = True
@@ -69,7 +70,7 @@ class BMWCE02ChargeController:
         self._listeners.append(
             async_track_time_interval(self.hass, self._async_update_soc_calculation, timedelta(seconds=UPDATE_INTERVAL_CHARGING_SECONDS))
         )
-        self._notify_updates() # Notifie les entités de l'état (potentiellement restauré)
+        self._notify_updates() 
 
     def async_unsubscribe_listeners(self):
         for unsub_listener in self._listeners:
@@ -77,7 +78,6 @@ class BMWCE02ChargeController:
         self._listeners.clear()
 
     def start_charging_manual(self):
-        """Manually start the charging process via switch/service."""
         if not self.is_charging:
             self.is_charging = True
             self._soc_at_charge_start = self.current_soc
@@ -93,7 +93,6 @@ class BMWCE02ChargeController:
             self._notify_updates()
 
     def stop_charging_manual(self):
-        """Manually stop the charging process via switch/service."""
         if self.is_charging:
             self.is_charging = False
             self.persisted_is_charging = False
@@ -119,7 +118,7 @@ class BMWCE02ChargeController:
                  self._last_soc_update_time = self._charge_start_time
             else:
                  _LOGGER.warning(f"Charge start time is None for {self.device_name} during SoC calculation. Resetting last_soc_update_time.")
-                 return # Ne pas continuer si _charge_start_time est None ici
+                 return 
 
         current_time = datetime.now(timezone.utc)
         time_delta_seconds = (current_time - self._last_soc_update_time).total_seconds()
@@ -177,10 +176,10 @@ async def async_setup_entry(
     """Set up the BMW CE-02 SoC sensor."""
     controller = hass.data[DOMAIN][config_entry.entry_id]["controller"]
     soc_sensor = BMWCE02SoCSensor(config_entry, controller)
-    async_add_entities([soc_sensor], True) # True pour update_before_add
+    async_add_entities([soc_sensor], True) 
 
 
-class BMWCE02SoCSensor(RestoreSensor, SensorEntity):
+class BMWCE02SoCSensor(RestoreSensor, SensorEntity): # SensorEntity est maintenant importé
     """Representation of the BMW CE-02 Estimated SoC Sensor."""
     _attr_device_class = SensorDeviceClass.BATTERY
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -217,18 +216,23 @@ class BMWCE02SoCSensor(RestoreSensor, SensorEntity):
         self._attr_native_value = round(self._controller.current_soc, 1)
 
         self._controller.register_update_callback(self._handle_controller_update)
-
+        
         platform = async_get_current_platform()
-        platform.async_register_entity_service(
-            "set_current_soc",
-            {vol.Required("soc"): vol.All(vol.Coerce(float), vol.Range(min=0, max=100))},
-            self._controller.async_set_current_soc,
-        )
+        if platform: # S'assurer que la plateforme est disponible
+            platform.async_register_entity_service(
+                "set_current_soc",
+                {vol.Required("soc"): vol.All(vol.Coerce(float), vol.Range(min=0, max=100))},
+                self._controller.async_set_current_soc,
+            )
+        else:
+            _LOGGER.warning(f"Could not get platform to register service for {self.entity_id}")
+
 
     @callback
     def _handle_controller_update(self):
         self._attr_native_value = round(self._controller.current_soc, 1)
-        self.async_write_ha_state()
+        if self.hass: # Vérifie si l'entité est toujours attachée à hass
+            self.async_write_ha_state()
 
     @property
     def extra_state_attributes(self):
@@ -262,7 +266,7 @@ class BMWCE02SoCSensor(RestoreSensor, SensorEntity):
                     if duration_to_80_hours >= 0:
                        attrs["duration_to_80_pct_hours"] = round(duration_to_80_hours, 2)
                        attrs["time_at_80_pct"] = (now_utc + timedelta(hours=duration_to_80_hours)).isoformat()
-            elif current_soc_val < 100: # Déjà >= 80 mais pas 100
+            elif current_soc_val < 100: 
                 attrs["duration_to_80_pct_hours"] = "Atteint"
                 attrs["time_at_80_pct"] = "Atteint"
 
@@ -283,7 +287,7 @@ class BMWCE02SoCSensor(RestoreSensor, SensorEntity):
                             duration_in_phase2 = (soc_in_phase2_to_charge / 100.0 * BATTERY_CAPACITY_KWH) / CHARGER_POWER_PHASE2_KW
                             total_duration_to_100_hours += duration_in_phase2
                         elif soc_in_phase2_to_charge > 0 : can_charge_to_100 = False
-                else: # current_soc_val >= SOC_THRESHOLD_PHASE2
+                else: 
                     soc_to_reach_100_in_phase2 = 100.0 - current_soc_val
                     if CHARGER_POWER_PHASE2_KW > 0:
                         duration_in_phase2 = (soc_to_reach_100_in_phase2 / 100.0 * BATTERY_CAPACITY_KWH) / CHARGER_POWER_PHASE2_KW
@@ -297,11 +301,11 @@ class BMWCE02SoCSensor(RestoreSensor, SensorEntity):
                     attrs["duration_to_100_pct_hours"] = round(total_duration_to_100_hours, 2)
                     attrs["time_at_100_pct"] = (now_utc + timedelta(hours=total_duration_to_100_hours)).isoformat()
         
-        if current_soc_val >= 100.0: # Vérification finale, même si pas en charge
+        if current_soc_val >= 100.0: 
             attrs["duration_to_100_pct_hours"] = "Pleine"
             attrs["time_at_100_pct"] = "Pleine"
         if current_soc_val >= SOC_THRESHOLD_PHASE2:
-            attrs["duration_to_80_pct_hours"] = "Atteint" # Remplacera si déjà à 80+ et pas en charge
+            attrs["duration_to_80_pct_hours"] = "Atteint" 
             attrs["time_at_80_pct"] = "Atteint"
             
         return attrs
