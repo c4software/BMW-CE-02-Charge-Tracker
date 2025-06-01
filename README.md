@@ -31,15 +31,21 @@ Le composant utilise les valeurs suivantes :
 
 ## Installation
 
-1. **Clonage du Dépôt :**
-   * Clonez le dépôt GitHub dans votre répertoire `custom_components` de Home Assistant.
+La méthode recommandée pour installer ce composant personnalisé est via HACS (Home Assistant Community Store).
 
-1. **Copier les Fichiers (alternative) :**
-    * Assurez-vous d'avoir un dossier nommé `bmw_ce02_charge_tracker` (tout en minuscules avec underscores) dans votre répertoire `custom_components`.
-    * Copiez tous les fichiers du composant (`__init__.py`, `sensor.py`, `number.py`, `switch.py`, `binary_sensor.py`, `const.py`, `config_flow.py`, `manifest.json`) dans ce dossier `custom_components/bmw_ce02_charge_tracker/`.
+1. **Installation via HACS (Recommandé) :**
+    * Si vous n'avez pas HACS, installez-le d'abord. Suivez les [instructions officielles de HACS](https://hacs.xyz/docs/installation/prerequisites).
+    * Ouvrez HACS dans Home Assistant.
+    * Allez dans "Intégrations".
+    * Cliquez sur les trois points en haut à droite et sélectionnez "Dépôts personnalisés".
+    * Dans le champ "Dépôt", collez l'URL de ce dépôt GitHub : `https://github.com/c4software/BMW-CE-02-Charge-Tracker`
+    * Dans la catégorie, sélectionnez "Intégration".
+    * Cliquez sur "AJOUTER".
+    * Fermez la fenêtre des dépôts personnalisés.
+    * Recherchez "BMW CE-02 Charge Tracker" dans HACS et cliquez sur "INSTALLER".
+    * Suivez les instructions de HACS pour terminer l'installation.
 
-2. **Redémarrer Home Assistant :**
-    * Allez dans `Paramètres > Système` et cliquez sur `REDÉMARRER` (en haut à droite).
+3. **Redémarrer Home Assistant :**
 
 ## Configuration
 
@@ -92,25 +98,6 @@ Une fois configuré, le composant créera les entités suivantes (où `[nom_slug
   * `device_class: battery_charging`.
 
 *(Note : Les `entity_id` exacts peuvent varier légèrement en fonction de la manière dont Home Assistant "slugifie" le nom de l'appareil. Vous les trouverez dans Outils de développement > États).*
-
-## Services Fournis
-
-Pour ajuster manuellement le SoC, utilisez l'entité `number` directement via l'interface utilisateur OU via le service standard `number.set_value` :
-
-* **Service :** `number.set_value`
-  * **Cible (`target`) :**
-    * `entity_id`: L'ID de votre entité Nombre SoC (ex: `number.bmw_ce_02_soc`).
-  * **Données (`data`) :**
-    * `value`: La valeur du SoC à définir (nombre entre 0 et 100).
-  * **Exemple d'utilisation (Outils de développement > Services) :**
-
-        ```yaml
-        service: number.set_value
-        target:
-          entity_id: number.bmw_ce_02_soc # Remplacez par l'ID réel de votre entité
-        data:
-          value: 65
-        ```
 
 ## Utilisation
 
