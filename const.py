@@ -8,7 +8,7 @@ DEFAULT_NAME = "BMW CE-02"
 
 # Charging parameters
 CHARGER_POWER_PHASE1_KW = 0.9  # Puissance pour 0-80% SoC
-CHARGER_POWER_PHASE2_KW = 0.517 # Puissance pour 80-100% SoC (calculée)
+CHARGER_POWER_PHASE2_KW = 0.8 # Puissance pour 80-100% SoC
 BATTERY_CAPACITY_KWH = 3.92
 SOC_THRESHOLD_PHASE2 = 80 # Pourcentage SoC où la puissance de charge change
 
