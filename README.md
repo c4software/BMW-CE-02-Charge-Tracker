@@ -2,6 +2,8 @@
 
 Ce composant personnalisé pour Home Assistant vous permet de simuler et de suivre la charge de votre scooter électrique BMW CE-02. Il ne nécessite pas de connexion directe au véhicule ; la charge est déclenchée manuellement via un interrupteur dans Home Assistant.
 
+⚠️ **Attention :** Ce composant est une *simulation* et ne lit pas les données réelles du véhicule. Il est conçu pour vous aider à faire des cycles de charge (20 à 80%).
+
 ## Fonctionnalités
 
 * **Gestion du Niveau de Charge (SoC) :** Une entité "Nombre" (`number`) affiche le pourcentage de batterie estimé et permet de le régler manuellement (via un curseur ou un champ de saisie).
