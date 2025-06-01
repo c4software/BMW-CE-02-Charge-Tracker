@@ -28,8 +28,7 @@ Le composant utilise les valeurs suivantes, basées sur les informations typique
 ## Installation
 
 1. **Copier les Fichiers :**
-    * Téléchargez (ou copiez) l'intégralité du dossier `bmw_ce02_charge_tracker` (contenant `__init__.py`, `sensor.py`, `switch.py`, etc.) dans le dossier `custom_components` de votre installation Home Assistant.
-    * Si le dossier `custom_components` n'existe pas, vous devez le créer à la racine de votre configuration Home Assistant (au même niveau que `configuration.yaml`).
+    * Clonez ou téléchargez ce dépôt dans le dossier `custom_components` de votre configuration Home Assistant.
     * La structure devrait ressembler à : `<répertoire_config_ha>/custom_components/bmw_ce02_charge_tracker/`.
 
 2. **Redémarrer Home Assistant :**
