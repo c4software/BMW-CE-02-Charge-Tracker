@@ -1,4 +1,4 @@
-"""Sensor platform for BMW CE-02 Charge Tracker (duration and energy sensors)."""
+"""Sensor platform for BMW CE-02 Charge Tracker (duration, energy, and power sensors)."""
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -15,6 +15,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.const import (
     UnitOfTime,
     UnitOfEnergy,
+    UnitOfPower, 
 )
 
 from .const import (
@@ -51,11 +52,26 @@ class BMWCE02ChargeController:
         self.duration_to_80_pct_seconds: int | None = None
         self.duration_to_100_pct_seconds: int | None = None
         
-        # Nouveau pour le suivi de l'énergie
-        self.total_energy_consumed_kwh: float = 0.0 # Sera initialisé par BMWCE02EnergySensor
+        self.total_energy_consumed_kwh: float = 0.0
 
         self._update_callbacks = []
         self._listeners = []
+
+    @property
+    def current_simulated_power_kw(self) -> float:
+        """Return the current simulated charging power in kW."""
+        if not self.is_charging:
+            return 0.0
+        if self.current_soc is None: 
+             _LOGGER.warning("current_soc is None while trying to calculate simulated power.")
+             return 0.0
+        if self.current_soc >= 100.0:
+            return 0.0 
+        
+        if self.current_soc < SOC_THRESHOLD_PHASE2:
+            return CHARGER_POWER_PHASE1_KW
+        else: 
+            return CHARGER_POWER_PHASE2_KW
 
     async def async_initialize_listeners(self):
         self.async_unsubscribe_listeners() 
@@ -103,7 +119,7 @@ class BMWCE02ChargeController:
         if self.is_charging:
             self.is_charging = False
             self.persisted_is_charging = False
-            self._update_soc_calculation_logic(final_update=True) # Assure un dernier calcul SoC si besoin
+            self._update_soc_calculation_logic(final_update=True) 
             _LOGGER.info(f"{self.device_name} charging MANUALLY STOPPED. SoC: {self.current_soc:.1f}%")
             self._update_duration_metrics() 
             self._notify_updates()
@@ -134,10 +150,15 @@ class BMWCE02ChargeController:
 
         if time_delta_seconds <= 1: return
 
-        charge_power_kw = CHARGER_POWER_PHASE1_KW if self.current_soc < SOC_THRESHOLD_PHASE2 else CHARGER_POWER_PHASE2_KW
-        energy_added_kwh = charge_power_kw * (time_delta_seconds / 3600.0)
+        charge_power_kw_for_energy_calc = 0.0
+        if self.current_soc < SOC_THRESHOLD_PHASE2:
+            charge_power_kw_for_energy_calc = CHARGER_POWER_PHASE1_KW
+        elif self.current_soc < 100.0 : 
+            charge_power_kw_for_energy_calc = CHARGER_POWER_PHASE2_KW
         
-        if energy_added_kwh > 0: # Accumule l'énergie consommée
+        energy_added_kwh = charge_power_kw_for_energy_calc * (time_delta_seconds / 3600.0)
+        
+        if energy_added_kwh > 0: 
             self.total_energy_consumed_kwh += energy_added_kwh
 
         soc_added = (energy_added_kwh / BATTERY_CAPACITY_KWH) * 100.0
@@ -145,13 +166,12 @@ class BMWCE02ChargeController:
         if soc_added > 0:
             new_soc = self.current_soc + soc_added
             self.current_soc = min(100.0, new_soc)
-            _LOGGER.debug(f"{self.device_name} SoC update: +{soc_added:.3f}%. New: {self.current_soc:.1f}%. Energy added this tick: {energy_added_kwh:.4f} kWh")
+            _LOGGER.debug(f"{self.device_name} SoC update: +{soc_added:.3f}%. New: {self.current_soc:.1f}%. Energy tick: {energy_added_kwh:.4f} kWh")
         
         self._last_soc_update_time = current_time
         self.persisted_last_soc_update_time_str = current_time.isoformat()
 
     def _update_duration_metrics(self):
-        # ... (logique de _update_duration_metrics reste identique à la version précédente) ...
         if not self.is_charging or self.current_soc is None:
             self.elapsed_charging_seconds = 0
             self.duration_to_80_pct_seconds = 0 if (self.current_soc is not None and self.current_soc >= SOC_THRESHOLD_PHASE2) else None
@@ -203,7 +223,6 @@ class BMWCE02ChargeController:
     def register_update_callback(self, callback_func):
         if callback_func not in self._update_callbacks:
             self._update_callbacks.append(callback_func)
-        callback_func() 
 
     def remove_update_callback(self, callback_func):
         if callback_func in self._update_callbacks:
@@ -229,6 +248,7 @@ class BMWCE02ChargeController:
         else:
             _LOGGER.warning(f"Invalid SoC value for manual set: {soc_value}")
 
+# Fin de BMWCE02ChargeController
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -242,7 +262,8 @@ async def async_setup_entry(
         BMWCE02ElapsedChargingTimeSensor(config_entry, controller),
         BMWCE02TimeTo80PctSensor(config_entry, controller),
         BMWCE02TimeToFullSensor(config_entry, controller),
-        BMWCE02EnergySensor(config_entry, controller), # Ajout du capteur d'énergie
+        BMWCE02EnergySensor(config_entry, controller),
+        BMWCE02PowerSensor(config_entry, controller),
     ]
     
     async_add_entities(entities_to_add, True)
@@ -252,11 +273,11 @@ class BMWCE02EnergySensor(RestoreSensor, SensorEntity):
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
-    _attr_icon = "mdi:flash" # Ou mdi:lightning-bolt
+    _attr_icon = "mdi:flash"
     _attr_should_poll = False
     _attr_name: str
     _attr_unique_id: str
-    _attr_native_value: float | None = 0.0 # Valeur initiale pour RestoreSensor
+    _attr_native_value: float | None = 0.0
 
     def __init__(self, config_entry: ConfigEntry, controller: BMWCE02ChargeController):
         self._config_entry = config_entry
@@ -265,34 +286,24 @@ class BMWCE02EnergySensor(RestoreSensor, SensorEntity):
         self._attr_unique_id = f"{config_entry.entry_id}_energy_consumed"
 
     async def async_added_to_hass(self) -> None:
-        """Restore last state and subscribe to controller updates."""
-        await super().async_added_to_hass() # Important pour RestoreSensor
-
+        await super().async_added_to_hass()
         last_sensor_data = await self.async_get_last_sensor_data()
         restored_energy_kwh = 0.0
         if last_sensor_data and last_sensor_data.native_value is not None:
             try:
                 restored_energy_kwh = float(last_sensor_data.native_value)
-                _LOGGER.info(
-                    f"Restored energy for {self._controller.device_name} to {restored_energy_kwh:.3f} kWh"
-                )
+                _LOGGER.info(f"Restored energy for {self._controller.device_name} to {restored_energy_kwh:.3f} kWh")
             except ValueError:
-                _LOGGER.warning(
-                    f"Could not parse restored energy value: {last_sensor_data.native_value}"
-                )
-        
-        self._controller.total_energy_consumed_kwh = restored_energy_kwh # Initialise le contrôleur
-        self._attr_native_value = restored_energy_kwh # Définit l'état initial de ce capteur
-
+                _LOGGER.warning(f"Could not parse restored energy value: {last_sensor_data.native_value}")
+        self._controller.total_energy_consumed_kwh = restored_energy_kwh
+        self._attr_native_value = restored_energy_kwh
         @callback
         def _update_callback():
             self._attr_native_value = round(self._controller.total_energy_consumed_kwh, 3)
-            if self.hass:
-                self.async_write_ha_state()
-        
+            if self.hass: self.async_write_ha_state()
         self._controller.register_update_callback(_update_callback)
 
-    @property # Optionnel si _attr_native_value est directement géré
+    @property
     def native_value(self) -> float | None:
         return self._attr_native_value
 
@@ -309,6 +320,7 @@ class BMWCE02ElapsedChargingTimeSensor(SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_name: str
     _attr_unique_id: str
+    _attr_native_value: int | None # Défini par le callback
 
     def __init__(self, config_entry: ConfigEntry, controller: BMWCE02ChargeController):
         self._config_entry = config_entry
@@ -322,10 +334,12 @@ class BMWCE02ElapsedChargingTimeSensor(SensorEntity):
             self._attr_native_value = self._controller.elapsed_charging_seconds
             if self.hass: self.async_write_ha_state()
         self._controller.register_update_callback(_update_callback)
+        # L'appel initial à _update_callback via register_update_callback définira la valeur initiale.
 
     @property
     def device_info(self):
         return { "identifiers": {(DOMAIN, self._config_entry.entry_id)} }
+
 
 class BMWCE02TimeTo80PctSensor(SensorEntity):
     _attr_icon = "mdi:timer-arrow-right-outline"
@@ -355,11 +369,12 @@ class BMWCE02TimeTo80PctSensor(SensorEntity):
         def _update_callback():
             if self.hass: self.async_write_ha_state()
         self._controller.register_update_callback(_update_callback)
-        if self.hass: self.async_schedule_update_ha_state(True)
+        # La valeur sera mise à jour lors du premier _notify_updates du contrôleur.
         
     @property
     def device_info(self):
         return { "identifiers": {(DOMAIN, self._config_entry.entry_id)} }
+
 
 class BMWCE02TimeToFullSensor(SensorEntity):
     _attr_icon = "mdi:timer-check-outline"
@@ -389,8 +404,38 @@ class BMWCE02TimeToFullSensor(SensorEntity):
         def _update_callback():
             if self.hass: self.async_write_ha_state()
         self._controller.register_update_callback(_update_callback)
-        if self.hass: self.async_schedule_update_ha_state(True)
 
     @property
     def device_info(self):
         return { "identifiers": {(DOMAIN, self._config_entry.entry_id)} }
+
+
+class BMWCE02PowerSensor(SensorEntity):
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfPower.KILO_WATT
+    _attr_icon = "mdi:lightning-bolt"
+    _attr_should_poll = False
+    _attr_name: str
+    _attr_unique_id: str
+
+    def __init__(self, config_entry: ConfigEntry, controller: BMWCE02ChargeController):
+        self._config_entry = config_entry
+        self._controller = controller
+        self._attr_name = f"{self._controller.device_name} Puissance de Charge"
+        self._attr_unique_id = f"{config_entry.entry_id}_charging_power"
+
+    @property
+    def native_value(self) -> float | None:
+        power_kw = self._controller.current_simulated_power_kw
+        return round(power_kw, 3)
+
+    async def async_added_to_hass(self) -> None:
+        @callback
+        def _update_callback():
+            if self.hass: self.async_write_ha_state()
+        self._controller.register_update_callback(_update_callback)
+
+    @property
+    def device_info(self):
+        return {"identifiers": {(DOMAIN, self._config_entry.entry_id)}}
