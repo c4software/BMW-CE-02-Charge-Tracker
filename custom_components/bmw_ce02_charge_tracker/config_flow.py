@@ -1,17 +1,34 @@
+"""Config flow for BMW CE-02 Charge Tracker."""
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.core import callback
 from homeassistant.helpers.selector import (
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
+    EntitySelector,
+    EntitySelectorConfig,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+)
+from homeassistant.const import UnitOfPower
+
+from .const import (
+    DOMAIN,
+    CONF_DEVICE_NAME,
+    DEFAULT_NAME,
+    CONF_POWER_SENSOR_ENTITY_ID,
+    CONF_MIN_CHARGING_POWER,
+    DEFAULT_MIN_CHARGING_POWER_W,
 )
 
-from .const import DOMAIN, CONF_DEVICE_NAME, DEFAULT_NAME
-
 class BMWCE02ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for BMW CE-02 Charge Tracker."""
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
+        """Handle the initial step."""
         errors = {}
         if user_input is not None:
             return self.async_create_entry(title=user_input[CONF_DEVICE_NAME], data=user_input)
@@ -22,6 +39,25 @@ class BMWCE02ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_DEVICE_NAME, default=DEFAULT_NAME): TextSelector(
                     TextSelectorConfig(type=TextSelectorType.TEXT)
                 ),
+                vol.Required(CONF_POWER_SENSOR_ENTITY_ID): EntitySelector(
+                    EntitySelectorConfig(domain="sensor", device_class=UnitOfPower.WATT)
+                ),
+                vol.Required(
+                    CONF_MIN_CHARGING_POWER,
+                    default=DEFAULT_MIN_CHARGING_POWER_W,
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=0,
+                        max=100,
+                        step=0.1,
+                        mode=NumberSelectorMode.BOX,
+                        unit_of_measurement=UnitOfPower.WATT,
+                    )
+                ),
             }),
             errors=errors,
+            description_placeholders={
+                "entity_id_example": "sensor.your_smart_plug_power",
+                "min_power_example": str(DEFAULT_MIN_CHARGING_POWER_W),
+            },
         )
