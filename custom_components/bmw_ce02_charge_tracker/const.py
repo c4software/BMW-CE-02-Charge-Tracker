@@ -4,12 +4,12 @@ DOMAIN = "bmw_ce02_charge_tracker"
 
 # Configuration keys
 CONF_DEVICE_NAME = "device_name"
-CONF_POWER_SENSOR_ENTITY_ID = "power_sensor_entity_id" # New
-CONF_MIN_CHARGING_POWER = "min_charging_power"       # New
+CONF_POWER_SENSOR_ENTITY_ID = "power_sensor_entity_id"
+CONF_MIN_CHARGING_POWER = "min_charging_power"
 
 # Default values
 DEFAULT_NAME = "BMW CE-02"
-DEFAULT_MIN_CHARGING_POWER_W = 10.0 # Watts # New
+DEFAULT_MIN_CHARGING_POWER_W = 10.0 # Watts
 
 # Battery parameters (CHARGER_POWER)
 BATTERY_CAPACITY_KWH = 3.92
