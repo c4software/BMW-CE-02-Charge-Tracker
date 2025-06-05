@@ -1,7 +1,7 @@
 """Config flow for BMW CE-02 Charge Tracker."""
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.core import callback
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.helpers.selector import (
     TextSelector,
     TextSelectorConfig,
@@ -33,31 +33,32 @@ class BMWCE02ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             return self.async_create_entry(title=user_input[CONF_DEVICE_NAME], data=user_input)
 
+        data_schema=vol.Schema({
+            vol.Required(CONF_DEVICE_NAME, default=DEFAULT_NAME): TextSelector(
+                TextSelectorConfig(type=TextSelectorType.TEXT)
+            ),
+            vol.Required(CONF_POWER_SENSOR_ENTITY_ID): EntitySelector(
+                EntitySelectorConfig(
+                    domain="sensor",
+                    device_class=SensorDeviceClass.POWER
+                )
+            ),
+            vol.Required(
+                CONF_MIN_CHARGING_POWER,
+                default=DEFAULT_MIN_CHARGING_POWER_W,
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=0,
+                    max=2500,
+                    step=0.1,
+                    mode=NumberSelectorMode.BOX,
+                    unit_of_measurement=UnitOfPower.WATT,
+                )
+            ),
+        })
+
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({
-                vol.Required(CONF_DEVICE_NAME, default=DEFAULT_NAME): TextSelector(
-                    TextSelectorConfig(type=TextSelectorType.TEXT)
-                ),
-                vol.Required(CONF_POWER_SENSOR_ENTITY_ID): EntitySelector(
-                    EntitySelectorConfig(domain="sensor", device_class=UnitOfPower.WATT)
-                ),
-                vol.Required(
-                    CONF_MIN_CHARGING_POWER,
-                    default=DEFAULT_MIN_CHARGING_POWER_W,
-                ): NumberSelector(
-                    NumberSelectorConfig(
-                        min=0,
-                        max=100,
-                        step=0.1,
-                        mode=NumberSelectorMode.BOX,
-                        unit_of_measurement=UnitOfPower.WATT,
-                    )
-                ),
-            }),
-            errors=errors,
-            description_placeholders={
-                "entity_id_example": "sensor.your_smart_plug_power",
-                "min_power_example": str(DEFAULT_MIN_CHARGING_POWER_W),
-            },
+            data_schema=data_schema,
+            errors=errors
         )

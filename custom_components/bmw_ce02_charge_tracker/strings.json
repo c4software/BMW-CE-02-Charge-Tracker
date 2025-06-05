@@ -1,0 +1,34 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "BMW CE-02 Charge Tracker Setup",
+        "description": "Configurez le suivi de charge pour votre BMW CE-02.",
+        "data": {
+          "device_name": "Nom de l'appareil",
+          "power_sensor_entity_id": "Entité du capteur de puissance (W)",
+          "min_charging_power": "Puissance de charge minimale (W)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de se connecter.",
+      "unknown": "Erreur inconnue."
+    },
+    "abort": {
+      "already_configured": "Cet appareil est déjà configuré."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "BMW CE-02 Charge Tracker Options",
+        "description": "Modifiez les options pour le suivi de charge de votre BMW CE-02.",
+        "data": {
+          "power_sensor_entity_id": "Entité du capteur de puissance (W)",
+          "min_charging_power": "Puissance de charge minimale (W) pour considérer en charge"
+        }
+      }
+    }
+  }
+}
