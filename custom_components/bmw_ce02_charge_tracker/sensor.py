@@ -231,27 +231,15 @@ class BMWCE02ChargeController:
             self.duration_to_100_pct_seconds = 0  # Full
         else:
             total_duration_hours = 0.0
-            temp_current_soc = current_soc_val
-            estimation_power_phase2_kw = 0.5 # Default from original for estimation beyond 80%
-            
-            # Part 1: SoC from current to SOC_THRESHOLD_PHASE2 (e.g., 80%)
-            if temp_current_soc < SOC_THRESHOLD_PHASE2:
-                soc_needed_phase1 = SOC_THRESHOLD_PHASE2 - temp_current_soc
-                if estimation_power_phase1_kw > 0:
-                    total_duration_hours += (soc_needed_phase1 / 100.0 * BATTERY_CAPACITY_KWH) / estimation_power_phase1_kw
-                    temp_current_soc = SOC_THRESHOLD_PHASE2
-                else: # Cannot estimate if power is zero
-                    self.duration_to_100_pct_seconds = None
-                    return 
-            
-            # Part 2: SoC from SOC_THRESHOLD_PHASE2 to 100%
-            if temp_current_soc < 100.0:
-                soc_needed_phase2 = 100.0 - temp_current_soc
-                if estimation_power_phase2_kw > 0:
-                    total_duration_hours += (soc_needed_phase2 / 100.0 * BATTERY_CAPACITY_KWH) / estimation_power_phase2_kw
-                elif soc_needed_phase2 > 0 : # Needs charge but power is zero
-                    self.duration_to_100_pct_seconds = None
-                    return
+            temp_current_soc = current_soc_val            
+
+            soc_needed_phase1 = SOC_THRESHOLD_PHASE2 - temp_current_soc
+            if estimation_power_phase1_kw > 0:
+                total_duration_hours += (soc_needed_phase1 / 100.0 * BATTERY_CAPACITY_KWH) / estimation_power_phase1_kw
+                temp_current_soc = SOC_THRESHOLD_PHASE2
+            else: # Cannot estimate if power is zero
+                self.duration_to_100_pct_seconds = None
+                return 
             
             if total_duration_hours >= 0:
                 self.duration_to_100_pct_seconds = round(total_duration_hours * 3600)
