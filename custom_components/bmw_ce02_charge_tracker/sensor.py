@@ -31,6 +31,7 @@ from .const import (
     TIME_REMAINING_STATUS_REACHED,
     TIME_REMAINING_STATUS_FULL,
     TIME_REMAINING_STATUS_UNAVAILABLE,
+    CHARGER_LOST_FACTOR
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -74,8 +75,10 @@ class BMWCE02ChargeController:
         if power_state and power_state.state not in [STATE_UNKNOWN, STATE_UNAVAILABLE]:
             try:
                 power_watts = float(power_state.state)
+                # Apply 8% reduction for conversion losses
+                power_watts_adjusted = power_watts * CHARGER_LOST_FACTOR
                 # Store the last known power for use in final calculations if power drops to 0 suddenly
-                self._last_known_power_kw = power_watts / 1000.0
+                self._last_known_power_kw = power_watts_adjusted / 1000.0
                 return self._last_known_power_kw
             except ValueError:
                 _LOGGER.warning(
