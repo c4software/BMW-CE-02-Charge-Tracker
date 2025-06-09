@@ -14,7 +14,7 @@ DEFAULT_MIN_CHARGING_POWER_W = 10.0 # Watts
 # Battery parameters (CHARGER_POWER)
 BATTERY_CAPACITY_KWH = 3.92
 # SOC_THRESHOLD_PHASE2 is still used for *estimating* time to 80%
-SOC_THRESHOLD_PHASE2 = 89 # Pourcentage SoC où la puissance de charge change (pour estimations)
+SOC_THRESHOLD_PHASE2 = 80 # Limite de l'état de charge pour la phase 2
 
 # Update interval for SoC calculation when charging
 UPDATE_INTERVAL_CHARGING_SECONDS = 60
