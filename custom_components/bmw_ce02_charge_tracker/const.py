@@ -17,6 +17,10 @@ BATTERY_CAPACITY_KWH = 3.92
 SOC_THRESHOLD_PHASE2 = 80 # Limite de l'état de charge pour la phase 2
 CHARGER_LOST_FACTOR = 0.92 # Perte de charge du chargeur
 
+# Facteur de ralentissement pour l'estimation au-dessus de 80% SoC, basé sur la mesure utilisateur
+# (70 minutes observées vs 43 minutes calculées -> 70/43 ≈ 1.63)
+SLOWDOWN_FACTOR_ABOVE_80_PCT = 1.63
+
 # Update interval for SoC calculation when charging
 UPDATE_INTERVAL_CHARGING_SECONDS = 60
 

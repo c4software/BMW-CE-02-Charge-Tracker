@@ -32,6 +32,7 @@ from .const import (
     TIME_REMAINING_STATUS_FULL,
     TIME_REMAINING_STATUS_UNAVAILABLE,
     CHARGER_LOST_FACTOR,
+    SLOWDOWN_FACTOR_ABOVE_80_PCT,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -203,12 +204,10 @@ class BMWCE02ChargeController:
         self._last_soc_update_time = current_time
 
     def _update_duration_metrics(self):
-        """Update elapsed time and estimated time remaining based on current real-time power."""
         current_power_for_estimation_kw = self._last_known_power_kw
 
         if not self.is_charging or self.current_soc is None or self._charge_start_time is None:
             self.elapsed_charging_seconds = 0
-            # Assurez-vous que SOC_THRESHOLD_PHASE2 est défini dans vos constantes (ex: 80)
             self.duration_to_80_pct_seconds = 0 if (self.current_soc is not None and self.current_soc >= SOC_THRESHOLD_PHASE2) else None
             self.duration_to_100_pct_seconds = 0 if (self.current_soc is not None and self.current_soc >= 100.0) else None
             return
@@ -216,28 +215,45 @@ class BMWCE02ChargeController:
         self.elapsed_charging_seconds = round((datetime.now(timezone.utc) - self._charge_start_time).total_seconds())
         current_soc_val = self.current_soc
         
-        # Seuil de puissance minimale en kW pour que l'estimation soit pertinente (ex: 10W)
         min_power_for_meaningful_estimation_kw = max(0.01, (self.min_charging_power_w / 1000.0) * 0.5)
 
-        # Fonction de calcul générique pour éviter la répétition
-        def calculate_duration(target_soc):
-            # Si la puissance est trop faible, on ne peut pas estimer
-            if current_power_for_estimation_kw < min_power_for_meaningful_estimation_kw:
-                return None
-            
-            soc_needed = target_soc - current_soc_val
-            if soc_needed <= 0:
-                return 0 # La cible est déjà atteinte ou dépassée
-            
-            # Calcul direct basé sur la puissance actuelle
-            duration_hours = (soc_needed / 100.0 * BATTERY_CAPACITY_KWH) / current_power_for_estimation_kw
-            return round(duration_hours * 3600)
+        # --- Estimation du temps jusqu'à 80% (linéaire) ---
+        if current_soc_val >= SOC_THRESHOLD_PHASE2:
+            self.duration_to_80_pct_seconds = 0
+        elif current_power_for_estimation_kw < min_power_for_meaningful_estimation_kw:
+            self.duration_to_80_pct_seconds = None
+        else:
+            soc_needed_to_80 = SOC_THRESHOLD_PHASE2 - current_soc_val
+            duration_hours_to_80 = (soc_needed_to_80 / 100.0 * BATTERY_CAPACITY_KWH) / current_power_for_estimation_kw
+            self.duration_to_80_pct_seconds = round(duration_hours_to_80 * 3600)
 
-        # Calcul pour le temps jusqu'à SOC_THRESHOLD_PHASE2 (80%)
-        self.duration_to_80_pct_seconds = calculate_duration(SOC_THRESHOLD_PHASE2)
-
-        # Calcul pour le temps jusqu'à 100%
-        self.duration_to_100_pct_seconds = calculate_duration(100.0)
+        # --- Estimation du temps jusqu'à 100% (avec facteur de ralentissement) ---
+        if current_soc_val >= 100.0:
+            self.duration_to_100_pct_seconds = 0
+        elif current_power_for_estimation_kw < min_power_for_meaningful_estimation_kw:
+            self.duration_to_100_pct_seconds = None
+        else:
+            total_duration_seconds = 0.0
+            
+            # Partie 1 : Temps du SoC actuel jusqu'à 80% (sans facteur)
+            if current_soc_val < SOC_THRESHOLD_PHASE2:
+                soc_needed_phase1 = SOC_THRESHOLD_PHASE2 - current_soc_val
+                duration_hours_phase1 = (soc_needed_phase1 / 100.0 * BATTERY_CAPACITY_KWH) / current_power_for_estimation_kw
+                total_duration_seconds += duration_hours_phase1 * 3600
+            
+            # Partie 2 : Temps de 80% (ou du SoC actuel s'il est > 80%) jusqu'à 100% (AVEC facteur)
+            start_soc_phase2 = max(current_soc_val, SOC_THRESHOLD_PHASE2)
+            soc_needed_phase2 = 100.0 - start_soc_phase2
+            
+            if soc_needed_phase2 > 0:
+                # Calculer la durée de base pour cette phase
+                base_duration_hours_phase2 = (soc_needed_phase2 / 100.0 * BATTERY_CAPACITY_KWH) / current_power_for_estimation_kw
+                
+                # Appliquer le facteur de ralentissement
+                adjusted_duration_hours_phase2 = base_duration_hours_phase2 * SLOWDOWN_FACTOR_ABOVE_80_PCT
+                total_duration_seconds += adjusted_duration_hours_phase2 * 3600
+            
+            self.duration_to_100_pct_seconds = round(total_duration_seconds)
 
     def register_update_callback(self, callback_func):
         if callback_func not in self._update_callbacks:
