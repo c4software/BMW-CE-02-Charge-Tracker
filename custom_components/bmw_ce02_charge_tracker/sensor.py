@@ -203,51 +203,41 @@ class BMWCE02ChargeController:
         self._last_soc_update_time = current_time
 
     def _update_duration_metrics(self):
-        """Update elapsed time and estimated time remaining."""
+        """Update elapsed time and estimated time remaining based on current real-time power."""
+        current_power_for_estimation_kw = self._last_known_power_kw
+
         if not self.is_charging or self.current_soc is None or self._charge_start_time is None:
             self.elapsed_charging_seconds = 0
+            # Assurez-vous que SOC_THRESHOLD_PHASE2 est défini dans vos constantes (ex: 80)
             self.duration_to_80_pct_seconds = 0 if (self.current_soc is not None and self.current_soc >= SOC_THRESHOLD_PHASE2) else None
             self.duration_to_100_pct_seconds = 0 if (self.current_soc is not None and self.current_soc >= 100.0) else None
             return
 
         self.elapsed_charging_seconds = round((datetime.now(timezone.utc) - self._charge_start_time).total_seconds())
-
         current_soc_val = self.current_soc
         
-        # Time to 80%
-        if current_soc_val >= SOC_THRESHOLD_PHASE2:
-            self.duration_to_80_pct_seconds = 0  # Reached
-        else:
-            estimation_power_phase1_kw = 0.9 # Default from original for estimation
-            if self._last_known_power_kw > 0.2: # If we have a somewhat reliable recent power
-                estimation_power_phase1_kw = max(self._last_known_power_kw, 0.2) # Ensure it's not too low for calc
+        # Seuil de puissance minimale en kW pour que l'estimation soit pertinente (ex: 10W)
+        min_power_for_meaningful_estimation_kw = max(0.01, (self.min_charging_power_w / 1000.0) * 0.5)
 
-            soc_needed_to_80 = SOC_THRESHOLD_PHASE2 - current_soc_val
-            if estimation_power_phase1_kw > 0:
-                duration_hours = (soc_needed_to_80 / 100.0 * BATTERY_CAPACITY_KWH) / estimation_power_phase1_kw
-                self.duration_to_80_pct_seconds = round(duration_hours * 3600) if duration_hours >= 0 else 0
-            else:
-                self.duration_to_80_pct_seconds = None 
-
-        # Time to 100%
-        if current_soc_val >= 100.0:
-            self.duration_to_100_pct_seconds = 0  # Full
-        else:
-            total_duration_hours = 0.0
-            temp_current_soc = current_soc_val            
-
-            soc_needed_phase1 = SOC_THRESHOLD_PHASE2 - temp_current_soc
-            if estimation_power_phase1_kw > 0:
-                total_duration_hours += (soc_needed_phase1 / 100.0 * BATTERY_CAPACITY_KWH) / estimation_power_phase1_kw
-                temp_current_soc = SOC_THRESHOLD_PHASE2
-            else: # Cannot estimate if power is zero
-                self.duration_to_100_pct_seconds = None
-                return 
+        # Fonction de calcul générique pour éviter la répétition
+        def calculate_duration(target_soc):
+            # Si la puissance est trop faible, on ne peut pas estimer
+            if current_power_for_estimation_kw < min_power_for_meaningful_estimation_kw:
+                return None
             
-            if total_duration_hours >= 0:
-                self.duration_to_100_pct_seconds = round(total_duration_hours * 3600)
-            else:
-                self.duration_to_100_pct_seconds = None
+            soc_needed = target_soc - current_soc_val
+            if soc_needed <= 0:
+                return 0 # La cible est déjà atteinte ou dépassée
+            
+            # Calcul direct basé sur la puissance actuelle
+            duration_hours = (soc_needed / 100.0 * BATTERY_CAPACITY_KWH) / current_power_for_estimation_kw
+            return round(duration_hours * 3600)
+
+        # Calcul pour le temps jusqu'à SOC_THRESHOLD_PHASE2 (80%)
+        self.duration_to_80_pct_seconds = calculate_duration(SOC_THRESHOLD_PHASE2)
+
+        # Calcul pour le temps jusqu'à 100%
+        self.duration_to_100_pct_seconds = calculate_duration(100.0)
 
     def register_update_callback(self, callback_func):
         if callback_func not in self._update_callbacks:
