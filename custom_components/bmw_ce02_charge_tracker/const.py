@@ -19,7 +19,7 @@ CHARGER_LOST_FACTOR = 0.92 # Perte de charge du chargeur
 
 # Facteur de ralentissement pour l'estimation au-dessus de 80% SoC, basé sur la mesure utilisateur
 # (70 minutes observées vs 43 minutes calculées -> 70/43 ≈ 1.63)
-SLOWDOWN_FACTOR_ABOVE_80_PCT = 1.63
+SLOWDOWN_FACTOR_ABOVE_80_PCT = 1.77
 
 # Update interval for SoC calculation when charging
 UPDATE_INTERVAL_CHARGING_SECONDS = 60
